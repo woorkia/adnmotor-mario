@@ -1,6 +1,7 @@
 import sqlite3
 import logging
 import os
+import bcrypt
 from datetime import datetime
 from config import DB_PATH
 
@@ -40,8 +41,44 @@ def initialize_db() -> None:
                 articles_published  INTEGER DEFAULT 0,
                 articles_failed     INTEGER DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS users (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                username   TEXT UNIQUE NOT NULL,
+                password   TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """)
+
+    # Crear usuario admin real solicitado por el usuario
+    with get_connection() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if count == 0:
+            pw_hash = bcrypt.hashpw("@MarioAdn99.".encode(), bcrypt.gensalt()).decode()
+            conn.execute(
+                "INSERT INTO users (username, password) VALUES (?, ?)",
+                ("adnmotor.com@gmail.com", pw_hash)
+            )
+            logger.info("Usuario administrador configurado: adnmotor.com@gmail.com")
+
     logger.debug(f"Base de datos inicializada en: {DB_PATH}")
+
+
+def get_user(username: str) -> dict | None:
+    """Devuelve el usuario por username, o None si no existe."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def verify_password(username: str, password: str) -> bool:
+    """Verifica username y contraseña con bcrypt. Devuelve True si son válidos."""
+    user = get_user(username)
+    if not user:
+        return False
+    return bcrypt.checkpw(password.encode(), user["password"].encode())
 
 
 def is_already_processed(source_url: str) -> bool:

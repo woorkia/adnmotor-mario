@@ -19,7 +19,8 @@ import threading
 from datetime import datetime, timedelta
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from functools import wraps
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 from requests.auth import HTTPBasicAuth
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -28,8 +29,20 @@ import config
 import database
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "adnmotor-secret-2024-xK9#mP2$")
 
 TASK_NAME = "ADNMotor Pipeline"
+
+
+# ─── AUTH ────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 # ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -270,7 +283,29 @@ def toggle_scheduler_task(enable: bool) -> dict:
 
 # ─── ROUTES ─────────────────────────────────────────────────────────────────
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if database.verify_password(username, password):
+            session["logged_in"] = True
+            session["username"] = username
+            return redirect(url_for("index"))
+        else:
+            error = "Usuario o contraseña incorrectos"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     database.initialize_db()
     return render_template(
@@ -284,16 +319,19 @@ def index():
 
 
 @app.route("/api/stats")
+@login_required
 def api_stats():
     return jsonify({"stats": get_stats(), "chart_data": get_chart_data()})
 
 
 @app.route("/api/logs")
+@login_required
 def api_logs():
     return jsonify({"lines": get_log_lines()})
 
 
 @app.route("/api/run", methods=["POST"])
+@login_required
 def api_run():
     """
     Lanza main.py en un proceso separado para no bloquear el dashboard.
@@ -315,11 +353,13 @@ def api_run():
 
 
 @app.route("/api/scheduler")
+@login_required
 def api_scheduler():
     return jsonify(get_scheduler_status())
 
 
 @app.route("/api/scheduler/create", methods=["POST"])
+@login_required
 def api_scheduler_create():
     data = request.get_json() or {}
     interval = int(data.get("interval", 4))
@@ -328,6 +368,7 @@ def api_scheduler_create():
 
 
 @app.route("/api/scheduler/toggle", methods=["POST"])
+@login_required
 def api_scheduler_toggle():
     data = request.get_json() or {}
     enable = bool(data.get("enable", True))
