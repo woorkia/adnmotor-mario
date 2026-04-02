@@ -7,3 +7,5 @@ lxml>=5.1.0
 flask>=3.0.0
 higgsfield-client>=0.1.0
 Pillow>=10.0.0
+gunicorn>=21.2.0
+APScheduler>=3.10.4

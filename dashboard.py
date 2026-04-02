@@ -21,6 +21,8 @@ from datetime import datetime, timedelta
 import requests
 from flask import Flask, jsonify, render_template, request
 from requests.auth import HTTPBasicAuth
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import config
 import database
@@ -166,55 +168,90 @@ def get_log_lines(n: int = 50) -> list:
         return [f"— Error leyendo log: {e}"]
 
 
-# ─── SCHEDULER ──────────────────────────────────────────────────────────────
+# ─── SCHEDULER (APScheduler) ────────────────────────────────────────────────
+
+scheduler = BackgroundScheduler()
+SCHEDULER_CONFIG_PATH = os.path.join(os.path.dirname(config.DB_PATH), "scheduler_config.json")
+
+def load_scheduler_config():
+    if os.path.exists(SCHEDULER_CONFIG_PATH):
+        try:
+            with open(SCHEDULER_CONFIG_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"enabled": False, "interval_hours": 4}
+
+def save_scheduler_config(conf):
+    with open(SCHEDULER_CONFIG_PATH, "w") as f:
+        json.dump(conf, f)
+
+def pipeline_job():
+    try:
+        subprocess.run(
+            [sys.executable, "main.py"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            timeout=600
+        )
+    except Exception as e:
+        print(f"Error in scheduled pipeline: {e}")
+
+def apply_scheduler_config():
+    conf = load_scheduler_config()
+    job_id = "adnmotor_pipeline"
+    if scheduler.get_job(job_id):
+        scheduler.remove_job(job_id)
+    
+    if conf.get("enabled", False):
+        hours = conf.get("interval_hours", 4)
+        scheduler.add_job(
+            func=pipeline_job,
+            trigger=IntervalTrigger(hours=hours),
+            id=job_id,
+            name=TASK_NAME,
+            replace_existing=True
+        )
+
+# Start scheduler initially
+apply_scheduler_config()
+scheduler.start()
 
 
 def get_scheduler_status() -> dict:
-    """Consulta el estado de la tarea en Windows Task Scheduler."""
+    """Consulta el estado del scheduler basado en APScheduler."""
+    conf = load_scheduler_config()
+    job = scheduler.get_job("adnmotor_pipeline")
+    
+    status = {
+        "exists": True,
+        "enabled": conf.get("enabled", False),
+        "next_run": "—",
+        "last_run": "—",
+        "interval": conf.get("interval_hours", 4)
+    }
+    
+    if job and job.next_run_time:
+        status["next_run"] = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+        
     try:
-        result = subprocess.run(
-            ["schtasks", "/Query", "/TN", TASK_NAME, "/FO", "LIST", "/V"],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            return {"exists": False, "enabled": False, "next_run": "—", "last_run": "—", "interval": None}
-
-        output = result.stdout
-        status = {"exists": True, "next_run": "—", "last_run": "—", "interval": None}
-        status["enabled"] = not any(x in output for x in ["Disabled", "Deshabilitada", "Deshabilitado"])
-
-        for line in output.splitlines():
-            low = line.lower()
-            if "next run time" in low or "próxima hora" in low or "proxima hora" in low:
-                val = line.split(":", 1)[1].strip() if ":" in line else "—"
-                status["next_run"] = val if val and val != "N/A" else "—"
-            if "last run time" in low or "última hora" in low or "ultima hora" in low:
-                val = line.split(":", 1)[1].strip() if ":" in line else "—"
-                status["last_run"] = val if val and val != "N/A" else "—"
-            if "schedule type" in low or "tipo de programación" in low or "tipo de programacion" in low:
-                status["schedule_type"] = line.split(":", 1)[1].strip() if ":" in line else "—"
-
-        return status
-    except Exception as e:
-        return {"exists": False, "enabled": False, "next_run": "—", "last_run": "—", "error": str(e)}
+        with _db_conn() as conn:
+            row = conn.execute("SELECT run_at FROM run_log ORDER BY run_at DESC LIMIT 1").fetchone()
+            status["last_run"] = row[0] if row else "—"
+    except Exception:
+        pass
+        
+    return status
 
 
 def create_scheduler_task(interval_hours: int = 4) -> dict:
     """Crea o recrea la tarea programada con el intervalo dado."""
     try:
-        python_exe = sys.executable
-        script_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py"))
-        cmd = [
-            "schtasks", "/Create",
-            "/TN", TASK_NAME,
-            "/TR", f'"{python_exe}" "{script_path}"',
-            "/SC", "HOURLY",
-            "/MO", str(interval_hours),
-            "/ST", "09:00",
-            "/F",
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        return {"ok": result.returncode == 0, "output": (result.stdout or result.stderr).strip()}
+        conf = load_scheduler_config()
+        conf["interval_hours"] = interval_hours
+        conf["enabled"] = True
+        save_scheduler_config(conf)
+        apply_scheduler_config()
+        return {"ok": True, "output": f"Configurado para ejecutarse cada {interval_hours}h usando APScheduler."}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
@@ -222,12 +259,11 @@ def create_scheduler_task(interval_hours: int = 4) -> dict:
 def toggle_scheduler_task(enable: bool) -> dict:
     """Habilita o deshabilita la tarea programada."""
     try:
-        action = "/Enable" if enable else "/Disable"
-        result = subprocess.run(
-            ["schtasks", action, "/TN", TASK_NAME],
-            capture_output=True, text=True, timeout=10
-        )
-        return {"ok": result.returncode == 0, "output": (result.stdout or result.stderr).strip()}
+        conf = load_scheduler_config()
+        conf["enabled"] = enable
+        save_scheduler_config(conf)
+        apply_scheduler_config()
+        return {"ok": True, "output": "Activado" if enable else "Desactivado"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

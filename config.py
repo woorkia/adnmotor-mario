@@ -62,11 +62,13 @@ CATEGORY_MAP = {
 }
 
 # --- Base de datos ---
-# Usar ruta fuera de OneDrive para evitar conflictos de lock durante sync
-DB_PATH = os.path.join(os.path.expanduser("~"), "AppData", "Local", "adnmotor", "adnmotor.db")
+# Ruta multiplataforma (ideal para Discos Persistentes en Render)
+data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+os.makedirs(data_dir, exist_ok=True)
+DB_PATH = os.path.join(data_dir, "adnmotor.db")
 
 # --- Logging ---
-LOG_DIR = "logs"
+LOG_DIR = os.path.join(data_dir, "logs")
 LOG_FILE = os.path.join(LOG_DIR, "adnmotor.log")
 LOG_MAX_BYTES = 5 * 1024 * 1024   # 5 MB
 LOG_BACKUP_COUNT = 3
