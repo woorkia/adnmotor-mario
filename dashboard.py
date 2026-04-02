@@ -29,7 +29,9 @@ import config
 import database
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "adnmotor-secret-2024-xK9#mP2$")
+# Usar clave aleatoria si no hay variable de entorno (vuelve a pedir login al reiniciar el servidor)
+# Recomendado: configurar SECRET_KEY en Render para sesiones persistentes.
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
 TASK_NAME = "ADNMotor Pipeline"
 

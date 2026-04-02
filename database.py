@@ -50,16 +50,17 @@ def initialize_db() -> None:
             );
         """)
 
-    # Crear usuario admin real solicitado por el usuario
+    # Crear usuario admin inicial (contraseña vía env var por seguridad)
+    initial_password = os.environ.get("INITIAL_ADMIN_PASSWORD", "ADNmotoR_2024_ChangeMe!")
     with get_connection() as conn:
         count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         if count == 0:
-            pw_hash = bcrypt.hashpw("@MarioAdn99.".encode(), bcrypt.gensalt()).decode()
+            pw_hash = bcrypt.hashpw(initial_password.encode(), bcrypt.gensalt()).decode()
             conn.execute(
                 "INSERT INTO users (username, password) VALUES (?, ?)",
                 ("adnmotor.com@gmail.com", pw_hash)
             )
-            logger.info("Usuario administrador configurado: adnmotor.com@gmail.com")
+            logger.info("Usuario administrador configurando con contraseña inicial (cambiar en Render)")
 
     logger.debug(f"Base de datos inicializada en: {DB_PATH}")
 
