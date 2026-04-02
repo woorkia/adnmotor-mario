@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADNMotor · Panel de Automatización</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  /* ─── RESET & BASE ────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:       #e63946;
+    --red-dim:   #a82533;
+    --bg:        #0b0d11;
+    --bg2:       #12151c;
+    --bg3:       #1a1e28;
+    --border:    #252932;
+    --text:      #e8eaf0;
+    --text-muted:#6b7280;
+    --text-dim:  #9ca3af;
+    --green:     #22c55e;
+    --amber:     #f59e0b;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Barlow', sans-serif;
+    --condensed: 'Barlow Condensed', sans-serif;
+  }
+
+  html { font-size: 15px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── LAYOUT ───────────────────────────────────────────────── */
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 28px 60px;
+  }
+
+  /* ─── HEADER ───────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 28px 0 24px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .logo-block {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+
+  .logo {
+    font-family: var(--condensed);
+    font-weight: 800;
+    font-size: 2.4rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1;
+    position: relative;
+  }
+
+  .logo span {
+    color: var(--red);
+  }
+
+  .logo-sub {
+    font-family: var(--condensed);
+    font-weight: 300;
+    font-size: 0.85rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.idle { background: var(--text-muted); box-shadow: none; animation: none; }
+  .status-dot.running { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .btn-run {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    font-family: var(--condensed);
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-run::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+  }
+
+  .btn-run:hover { background: #c8303c; }
+  .btn-run:active { transform: scale(0.97); }
+  .btn-run:disabled { background: var(--bg3); color: var(--text-muted); cursor: not-allowed; }
+
+  .btn-run svg { width: 14px; height: 14px; }
+
+  /* ─── SECTION LABELS ───────────────────────────────────────── */
+  .section-label {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ─── STATS ROW ────────────────────────────────────────────── */
+  .stats-section { padding: 32px 0 0; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 22px 24px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--red);
+  }
+
+  .stat-card:hover { border-color: #333847; }
+
+  .stat-label {
+    font-family: var(--condensed);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: var(--condensed);
+    font-weight: 800;
+    font-size: 3.2rem;
+    line-height: 1;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+
+  .stat-value.highlight { color: var(--red); }
+  .stat-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* ─── MAIN GRID ────────────────────────────────────────────── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 12px;
+    padding: 28px 0 0;
+  }
+
+  @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* ─── CARD (reusable panel) ────────────────────────────────── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 24px;
+  }
+
+  /* ─── CHART ────────────────────────────────────────────────── */
+  .chart-wrap {
+    position: relative;
+    height: 240px;
+  }
+
+  /* ─── TABLES ───────────────────────────────────────────────── */
+  .table-section { padding: 28px 0 0; }
+
+  .table-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  thead th {
+    font-family: var(--condensed);
+    font-weight: 600;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.035);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: rgba(255,255,255,0.025); }
+  tbody tr:last-child { border-bottom: none; }
+
+  td {
+    padding: 11px 14px;
+    color: var(--text-dim);
+    vertical-align: middle;
+  }
+
+  td.title-cell {
+    color: var(--text);
+    font-weight: 500;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  td.mono { font-family: var(--mono); font-size: 0.78rem; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 2px;
+    font-family: var(--condensed);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .badge-ok    { background: rgba(34,197,94,0.12);  color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+  .badge-fail  { background: rgba(230,57,70,0.12);  color: var(--red);   border: 1px solid rgba(230,57,70,0.25); }
+  .badge-warn  { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+
+  .badge-type {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    font-family: var(--condensed);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+
+  .btn-view {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--red);
+    border: 1px solid var(--red-dim);
+    border-radius: 2px;
+    font-family: var(--condensed);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .btn-view:hover { background: var(--red); color: #fff; }
+  .btn-view svg { width: 10px; height: 10px; }
+
+  .num-green { color: var(--green); font-family: var(--mono); font-size: 0.82rem; }
+  .num-red   { color: var(--red);   font-family: var(--mono); font-size: 0.82rem; }
+  .num-amber { color: var(--amber); font-family: var(--mono); font-size: 0.82rem; }
+  .num-dim   { color: var(--text-dim); font-family: var(--mono); font-size: 0.82rem; }
+
+  .empty-row td {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 32px;
+    font-size: 0.82rem;
+  }
+
+  /* ─── LOG TERMINAL ─────────────────────────────────────────── */
+  .log-section { padding: 28px 0 0; }
+
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .log-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .log-refresh-indicator {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+
+  .log-box {
+    background: #080a0d;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    height: 300px;
+    overflow-y: auto;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: #7c8594;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg3) transparent;
+  }
+
+  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+
+  .log-line { display: block; white-space: pre-wrap; word-break: break-all; }
+  .log-line:hover { color: var(--text-dim); }
+
+  .log-line.level-INFO    { color: #7c8594; }
+  .log-line.level-WARNING { color: #d97706; }
+  .log-line.level-ERROR,
+  .log-line.level-CRITICAL{ color: #ef4444; }
+
+  .log-line .ts   { color: #3d4451; }
+  .log-line .lvl  { }
+  .log-line .src  { color: #4a5568; }
+  .log-line .msg  { color: inherit; }
+
+  /* ─── TOAST ────────────────────────────────────────────────── */
+  #toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 1000;
+    padding: 14px 20px;
+    border-radius: 2px;
+    font-family: var(--condensed);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    pointer-events: none;
+    max-width: 340px;
+  }
+
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { background: #0f2b17; border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+  #toast.error   { background: #2b0f12; border: 1px solid rgba(230,57,70,0.3);  color: var(--red); }
+  #toast.info    { background: #1a1e28; border: 1px solid var(--border);          color: var(--text-dim); }
+
+  /* ─── SCHEDULER ────────────────────────────────────────────── */
+  .scheduler-section { padding: 28px 0 0; }
+
+  .scheduler-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .scheduler-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .scheduler-state {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .scheduler-state-label {
+    font-family: var(--condensed);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .scheduler-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .scheduler-meta-item {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .scheduler-meta-item span {
+    color: var(--text-dim);
+  }
+
+  .scheduler-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .interval-select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: var(--condensed);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 9px 14px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .interval-select:focus { border-color: var(--red); }
+
+  .btn-sched {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 20px;
+    border: none;
+    border-radius: 2px;
+    font-family: var(--condensed);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .btn-sched:active { transform: scale(0.97); }
+  .btn-sched:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-sched-on  { background: var(--green); color: #000; }
+  .btn-sched-on:hover  { background: #16a34a; }
+
+  .btn-sched-off { background: rgba(230,57,70,0.15); color: var(--red); border: 1px solid rgba(230,57,70,0.3); }
+  .btn-sched-off:hover { background: rgba(230,57,70,0.25); }
+
+  .btn-sched-update { background: var(--bg3); color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-sched-update:hover { border-color: #555; color: var(--text); }
+
+  /* ─── SCROLLBAR ────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── HEADER ───────────────────────────────────────────────── -->
+  <header>
+    <div class="logo-block">
+      <div class="logo"><span>ADN</span>Motor</div>
+      <div class="logo-sub">Panel de Automatización</div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot idle" id="statusDot"></span>
+        <span id="statusText">Inactivo</span>
+      </div>
+      <button class="btn-run" id="btnRun" onclick="triggerRun()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Ejecutar Ahora
+      </button>
+    </div>
+  </header>
+
+  <!-- ── STATS ─────────────────────────────────────────────────── -->
+  <section class="stats-section">
+    <div class="section-label">Resumen</div>
+    <div class="stats-grid">
+      <div class="stat-card" id="statToday">
+        <div class="stat-label">Artículos hoy</div>
+        <div class="stat-value highlight" id="valToday">{{ stats.today }}</div>
+        <div class="stat-sub">publicados como borrador</div>
+      </div>
+      <div class="stat-card" id="statWeek">
+        <div class="stat-label">Esta semana</div>
+        <div class="stat-value" id="valWeek">{{ stats.week }}</div>
+        <div class="stat-sub">últimos 7 días</div>
+      </div>
+      <div class="stat-card" id="statTotal">
+        <div class="stat-label">Total publicados</div>
+        <div class="stat-value" id="valTotal">{{ stats.total }}</div>
+        <div class="stat-sub">histórico acumulado</div>
+      </div>
+      <div class="stat-card" id="statSuccess">
+        <div class="stat-label">Tasa de éxito</div>
+        <div class="stat-value" id="valSuccess">{{ "%.0f"|format(stats.success_rate) }}<span style="font-size:1.6rem;color:var(--text-muted)">%</span></div>
+        <div class="stat-sub">artículos procesados OK</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SCHEDULER ────────────────────────────────────────────── -->
+  <section class="scheduler-section">
+    <div class="section-label">Automatización</div>
+    <div class="card scheduler-card">
+
+      <div class="scheduler-left">
+        <div class="scheduler-state">
+          <span class="status-dot idle" id="schedDot"></span>
+          <span class="scheduler-state-label" id="schedStateText">Cargando...</span>
+        </div>
+        <div class="scheduler-meta">
+          <div class="scheduler-meta-item">Próxima ejecución: <span id="schedNext">—</span></div>
+          <div class="scheduler-meta-item">Última ejecución: <span id="schedLast">—</span></div>
+        </div>
+      </div>
+
+      <div class="scheduler-right">
+        <select id="intervalSelect" class="interval-select">
+          <option value="2">Cada 2 horas</option>
+          <option value="4" selected>Cada 4 horas</option>
+          <option value="6">Cada 6 horas</option>
+          <option value="8">Cada 8 horas</option>
+          <option value="12">Cada 12 horas</option>
+          <option value="24">Una vez al día</option>
+        </select>
+        <button class="btn-sched btn-sched-on" id="btnSchedOn" onclick="activarScheduler()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Activar
+        </button>
+        <button class="btn-sched btn-sched-off" id="btnSchedOff" onclick="desactivarScheduler()" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          Pausar
+        </button>
+        <button class="btn-sched btn-sched-update" id="btnSchedUpdate" onclick="actualizarIntervalo()" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.12"/></svg>
+          Cambiar intervalo
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── CHART + RUNS ──────────────────────────────────────────── -->
+  <div class="main-grid">
+
+    <div class="card">
+      <div class="section-label">Actividad · 7 días</div>
+      <div class="chart-wrap">
+        <canvas id="activityChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Últimas ejecuciones</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha / Hora</th>
+              <th>Captados</th>
+              <th>Procesados</th>
+              <th>Publicados</th>
+              <th>Fallidos</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="runsBody">
+            {% if runs %}
+              {% for run in runs %}
+              <tr>
+                <td class="mono">{{ run.run_at[:16].replace("T"," ") if "T" in run.run_at else run.run_at[:16] }}</td>
+                <td class="num-dim">{{ run.articles_found }}</td>
+                <td class="num-dim">{{ run.articles_processed }}</td>
+                <td class="num-green">{{ run.articles_published }}</td>
+                <td class="{{ 'num-red' if run.articles_failed > 0 else 'num-dim' }}">{{ run.articles_failed }}</td>
+                <td>
+                  {% if run.articles_failed == 0 and run.articles_published > 0 %}
+                    <span class="badge badge-ok">OK</span>
+                  {% elif run.articles_failed > 0 and run.articles_published > 0 %}
+                    <span class="badge badge-warn">Parcial</span>
+                  {% elif run.articles_failed > 0 %}
+                    <span class="badge badge-fail">Error</span>
+                  {% else %}
+                    <span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border)">Sin new</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr class="empty-row"><td colspan="6">Aún no hay ejecuciones registradas</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── DRAFTS TABLE ──────────────────────────────────────────── -->
+  <section class="table-section">
+    <div class="section-label">Borradores en WordPress</div>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Keyword SEO</th>
+              <th>Fuente</th>
+              <th>Fecha</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if drafts %}
+              {% for d in drafts %}
+              <tr>
+                <td class="title-cell" title="{{ d.title }}">{{ d.title }}</td>
+                <td><span class="badge-type">{{ d.article_type }}</span></td>
+                <td class="mono" style="color:var(--accent);font-size:0.76rem">{{ d.seo_keyword or '—' }}</td>
+                <td style="font-size:0.76rem">
+                  {% if d.source_url %}
+                    <a href="{{ d.source_url }}" target="_blank" rel="noopener"
+                       style="color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:4px;"
+                       title="{{ d.source_url }}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                      {{ d.source_name or 'Fuente' }}
+                    </a>
+                  {% else %}
+                    <span style="color:var(--text-muted)">—</span>
+                  {% endif %}
+                </td>
+                <td class="mono" style="font-size:0.76rem">{{ d.date[:10] if d.date else '—' }}</td>
+                <td>
+                  <a class="btn-view" href="{{ d.wp_link }}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Ver borrador
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr class="empty-row"><td colspan="6">No hay borradores aún. Ejecuta el pipeline para generar artículos.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── LOG TERMINAL ──────────────────────────────────────────── -->
+  <section class="log-section">
+    <div class="log-header">
+      <div class="section-label" style="margin-bottom:0;flex:1">Log en tiempo real</div>
+      <div class="log-controls">
+        <span class="log-refresh-indicator" id="logRefreshLabel">— actualizando en <span id="logCountdown">10</span>s</span>
+      </div>
+    </div>
+    <div class="log-box" id="logBox">
+      {% if log_lines %}
+        {% for line in log_lines %}
+          {{ line | safe }}
+        {% endfor %}
+      {% else %}
+        <span class="log-line level-INFO"><span class="ts">—</span> <span class="msg">Esperando logs...</span></span>
+      {% endif %}
+    </div>
+  </section>
+
+</div><!-- /shell -->
+
+<!-- ── TOAST ─────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ─── CHART ────────────────────────────────────────────────────
+const chartLabels = {{ chart_data.labels | tojson }};
+const chartValues = {{ chart_data.data | tojson }};
+
+const ctx = document.getElementById('activityChart').getContext('2d');
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: chartLabels,
+    datasets: [{
+      label: 'Artículos publicados',
+      data: chartValues,
+      backgroundColor: chartValues.map((v, i) =>
+        i === chartValues.length - 1 ? 'rgba(230,57,70,0.85)' : 'rgba(230,57,70,0.28)'
+      ),
+      borderColor: chartValues.map((v, i) =>
+        i === chartValues.length - 1 ? '#e63946' : 'rgba(230,57,70,0.5)'
+      ),
+      borderWidth: 1,
+      borderRadius: 2,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a1e28',
+        borderColor: '#252932',
+        borderWidth: 1,
+        titleColor: '#9ca3af',
+        bodyColor: '#e8eaf0',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
+        padding: 10,
+        callbacks: {
+          label: ctx => ` ${ctx.parsed.y} artículo${ctx.parsed.y !== 1 ? 's' : ''}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+        ticks: {
+          color: '#6b7280',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+        },
+        border: { display: false }
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+        ticks: {
+          color: '#6b7280',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          stepSize: 1,
+        },
+        border: { display: false },
+        beginAtZero: true,
+      }
+    }
+  }
+});
+
+// ─── RUN PIPELINE ─────────────────────────────────────────────
+async function triggerRun() {
+  const btn = document.getElementById('btnRun');
+  const dot = document.getElementById('statusDot');
+  const statusTxt = document.getElementById('statusText');
+
+  btn.disabled = true;
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Ejecutando...`;
+
+  dot.className = 'status-dot running';
+  statusTxt.textContent = 'Ejecutando pipeline...';
+
+  showToast('Pipeline iniciado en segundo plano', 'info');
+
+  try {
+    const res = await fetch('/api/run', { method: 'POST' });
+    const data = await res.json();
+
+    if (data.ok) {
+      showToast('Pipeline ejecutado correctamente', 'success');
+    } else {
+      showToast(data.error || 'Error al iniciar pipeline', 'error');
+    }
+  } catch (e) {
+    showToast('Error de conexión', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"/></svg> Ejecutar Ahora`;
+    dot.className = 'status-dot idle';
+    statusTxt.textContent = 'Inactivo';
+    refreshStats();
+  }
+}
+
+// ─── LOG AUTO-REFRESH ──────────────────────────────────────────
+let logCountdown = 10;
+const logBox = document.getElementById('logBox');
+
+function colorizeLogLine(line) {
+  // Detectar nivel
+  let level = 'level-INFO';
+  if (/WARNING/i.test(line)) level = 'level-WARNING';
+  else if (/ERROR|CRITICAL/i.test(line)) level = 'level-ERROR';
+
+  // Separar partes: "2026-03-28 14:32:01 | INFO     | module | message"
+  const parts = line.split(' | ');
+  if (parts.length >= 3) {
+    const ts  = parts[0] || '';
+    const lvl = (parts[1] || '').trim();
+    const src = (parts[2] || '').trim();
+    const msg = parts.slice(3).join(' | ') || '';
+    return `<span class="log-line ${level}"><span class="ts">${esc(ts)}</span> <span style="color:#555f6e">│</span> <span class="lvl">${esc(lvl)}</span> <span style="color:#3d4451">│</span> <span class="src">${esc(src)}</span> <span style="color:#3d4451">│</span> <span class="msg">${esc(msg)}</span></span>`;
+  }
+  return `<span class="log-line ${level}">${esc(line)}</span>`;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function refreshLogs() {
+  try {
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    if (data.lines) {
+      const atBottom = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 40;
+      logBox.innerHTML = data.lines.map(colorizeLogLine).join('\n');
+      if (atBottom) logBox.scrollTop = logBox.scrollHeight;
+    }
+  } catch (e) { /* silently fail */ }
+}
+
+// Scroll to bottom on load
+window.addEventListener('load', () => {
+  // Colorize initial log lines
+  const rawLines = logBox.innerText.split('\n').filter(l => l.trim());
+  if (rawLines.length > 0 && rawLines[0] !== '— Esperando logs...') {
+    logBox.innerHTML = rawLines.map(colorizeLogLine).join('\n');
+  }
+  logBox.scrollTop = logBox.scrollHeight;
+  startLogCountdown();
+});
+
+function startLogCountdown() {
+  logCountdown = 10;
+  const el = document.getElementById('logCountdown');
+  const interval = setInterval(() => {
+    logCountdown--;
+    if (el) el.textContent = logCountdown;
+    if (logCountdown <= 0) {
+      clearInterval(interval);
+      refreshLogs().then(() => startLogCountdown());
+    }
+  }, 1000);
+}
+
+// ─── STATS AUTO-REFRESH ────────────────────────────────────────
+async function refreshStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    if (data.stats) {
+      const s = data.stats;
+      animateNumber('valToday',   parseInt(document.getElementById('valToday').textContent)   || 0, s.today);
+      animateNumber('valWeek',    parseInt(document.getElementById('valWeek').textContent)    || 0, s.week);
+      animateNumber('valTotal',   parseInt(document.getElementById('valTotal').textContent)   || 0, s.total);
+      document.getElementById('valSuccess').innerHTML =
+        `${Math.round(s.success_rate)}<span style="font-size:1.6rem;color:var(--text-muted)">%</span>`;
+    }
+  } catch(e) { /* silently fail */ }
+}
+
+function animateNumber(id, from, to) {
+  const el = document.getElementById(id);
+  if (!el || from === to) return;
+  const steps = 20;
+  const delta = (to - from) / steps;
+  let current = from;
+  let step = 0;
+  const interval = setInterval(() => {
+    step++;
+    current += delta;
+    el.textContent = Math.round(current);
+    if (step >= steps) { el.textContent = to; clearInterval(interval); }
+  }, 30);
+}
+
+setInterval(refreshStats, 30000);
+
+// ─── SCHEDULER ─────────────────────────────────────────────────
+async function loadSchedulerStatus() {
+  try {
+    const res = await fetch('/api/scheduler');
+    const data = await res.json();
+    updateSchedulerUI(data);
+  } catch(e) {
+    document.getElementById('schedStateText').textContent = 'Error al conectar';
+  }
+}
+
+function updateSchedulerUI(data) {
+  const dot       = document.getElementById('schedDot');
+  const stateText = document.getElementById('schedStateText');
+  const btnOn     = document.getElementById('btnSchedOn');
+  const btnOff    = document.getElementById('btnSchedOff');
+  const btnUpdate = document.getElementById('btnSchedUpdate');
+  const next      = document.getElementById('schedNext');
+  const last      = document.getElementById('schedLast');
+
+  next.textContent = data.next_run || '—';
+  last.textContent = data.last_run || '—';
+
+  if (!data.exists) {
+    dot.className = 'status-dot idle';
+    stateText.textContent = 'No configurada';
+    stateText.style.color = 'var(--text-muted)';
+    btnOn.style.display = '';
+    btnOff.style.display = 'none';
+    btnUpdate.style.display = 'none';
+  } else if (data.enabled) {
+    dot.className = 'status-dot';
+    stateText.textContent = 'Activa · ejecutando automáticamente';
+    stateText.style.color = 'var(--green)';
+    btnOn.style.display = 'none';
+    btnOff.style.display = '';
+    btnUpdate.style.display = '';
+  } else {
+    dot.className = 'status-dot idle';
+    stateText.textContent = 'Pausada';
+    stateText.style.color = 'var(--amber)';
+    btnOn.style.display = '';
+    btnOn.textContent = 'Reactivar';
+    btnOff.style.display = 'none';
+    btnUpdate.style.display = '';
+  }
+}
+
+async function activarScheduler() {
+  const interval = parseInt(document.getElementById('intervalSelect').value);
+  const btn = document.getElementById('btnSchedOn');
+  btn.disabled = true;
+  btn.textContent = 'Configurando...';
+  try {
+    const res = await fetch('/api/scheduler/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ interval })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`Automatización activada · cada ${interval}h`, 'success');
+      await loadSchedulerStatus();
+    } else {
+      showToast('Error al crear la tarea: ' + (data.output || data.error || ''), 'error');
+    }
+  } catch(e) {
+    showToast('Error de conexión', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function desactivarScheduler() {
+  const btn = document.getElementById('btnSchedOff');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/scheduler/toggle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ enable: false })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('Automatización pausada', 'info');
+      await loadSchedulerStatus();
+    } else {
+      showToast('Error al pausar: ' + (data.output || data.error || ''), 'error');
+    }
+  } catch(e) {
+    showToast('Error de conexión', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function actualizarIntervalo() {
+  const interval = parseInt(document.getElementById('intervalSelect').value);
+  const btn = document.getElementById('btnSchedUpdate');
+  btn.disabled = true;
+  btn.textContent = 'Aplicando...';
+  try {
+    const res = await fetch('/api/scheduler/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ interval })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`Intervalo actualizado · cada ${interval}h`, 'success');
+      await loadSchedulerStatus();
+    } else {
+      showToast('Error: ' + (data.output || data.error || ''), 'error');
+    }
+  } catch(e) {
+    showToast('Error de conexión', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.12"/></svg> Cambiar intervalo`;
+  }
+}
+
+// Cargar estado del scheduler al iniciar
+window.addEventListener('load', () => { loadSchedulerStatus(); });
+setInterval(loadSchedulerStatus, 60000);
+
+// ─── TOAST ─────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const toast = document.getElementById('toast');
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>',
+    error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+  toast.className = `show ${type}`;
+  toast.innerHTML = `${icons[type] || ''} ${msg}`;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.className = type; }, 4000);
+}
+</script>
+</body>
+</html>
