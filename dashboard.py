@@ -231,6 +231,12 @@ def apply_scheduler_config():
 apply_scheduler_config()
 scheduler.start()
 
+# Asegurar que la BD está inicializada al arrancar el servidor (importante para Gunicorn)
+try:
+    database.initialize_db()
+except Exception as e:
+    print(f"Error initializing database: {e}")
+
 
 def get_scheduler_status() -> dict:
     """Consulta el estado del scheduler basado en APScheduler."""
@@ -310,7 +316,7 @@ def logout():
 @login_required
 def index():
     try:
-        database.initialize_db()
+        # Ya no inicializamos aquí por rendimiento, se hace al arrancar el proceso
         return render_template(
             "index.html",
             stats      = get_stats(),
@@ -321,9 +327,9 @@ def index():
         )
     except Exception as e:
         import traceback
-        error_msg = f"Error rendering index: {e}\n\n{traceback.format_exc()}"
-        print(error_msg)
-        return error_msg, 500
+        # Retornamos el error como texto para depuración fácil en el navegador
+        err_trace = traceback.format_exc()
+        return f"<h1>Error Interno (500)</h1><p>{e}</p><pre>{err_trace}</pre>", 500
 
 
 @app.route("/api/stats")

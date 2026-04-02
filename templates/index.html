@@ -704,7 +704,7 @@
             {% if runs %}
               {% for run in runs %}
               <tr>
-                <td class="mono">{{ run.run_at[:16].replace("T"," ") if "T" in run.run_at else run.run_at[:16] }}</td>
+                <td class="mono">{{ run.run_at[:16].replace("T"," ") if run.run_at and "T" in run.run_at else (run.run_at[:16] if run.run_at else "—") }}</td>
                 <td class="num-dim">{{ run.articles_found }}</td>
                 <td class="num-dim">{{ run.articles_processed }}</td>
                 <td class="num-green">{{ run.articles_published }}</td>
