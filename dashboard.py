@@ -309,15 +309,21 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    database.initialize_db()
-    return render_template(
-        "index.html",
-        stats      = get_stats(),
-        runs       = get_runs(),
-        drafts     = get_wp_drafts(),
-        chart_data = get_chart_data(),
-        log_lines  = get_log_lines(),
-    )
+    try:
+        database.initialize_db()
+        return render_template(
+            "index.html",
+            stats      = get_stats(),
+            runs       = get_runs(),
+            drafts     = get_wp_drafts(),
+            chart_data = get_chart_data(),
+            log_lines  = get_log_lines(),
+        )
+    except Exception as e:
+        import traceback
+        error_msg = f"Error rendering index: {e}\n\n{traceback.format_exc()}"
+        print(error_msg)
+        return error_msg, 500
 
 
 @app.route("/api/stats")
