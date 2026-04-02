@@ -61,9 +61,15 @@ CATEGORY_MAP = {
     "default":     19,  # NOTICIAS (fallback)
 }
 
-# --- Base de datos ---
-# Ruta multiplataforma (ideal para Discos Persistentes en Render)
-data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+# --- Base de datos y Persistencia ---
+# En Render (plan de pago), monta un 'Disk' en la ruta especificada por DATA_PATH
+# Por defecto usa la carpeta 'data' en la raíz del proyecto.
+data_path_env = os.getenv("DATA_PATH")
+if data_path_env:
+    data_dir = data_path_env
+else:
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
 os.makedirs(data_dir, exist_ok=True)
 DB_PATH = os.path.join(data_dir, "adnmotor.db")
 
