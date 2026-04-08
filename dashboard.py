@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 import requests
 from functools import wraps
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for, flash
 from requests.auth import HTTPBasicAuth
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -31,7 +31,8 @@ import database
 app = Flask(__name__)
 # Usar clave aleatoria si no hay variable de entorno (vuelve a pedir login al reiniciar el servidor)
 # Recomendado: configurar SECRET_KEY en Render para sesiones persistentes.
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+app.secret_key = os.environ.get("SECRET_KEY", "adnmotor-secret-2024-xK9#mP2$")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 TASK_NAME = "ADNMotor Pipeline"
 
@@ -297,13 +298,18 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        if database.verify_password(username, password):
-            session["logged_in"] = True
-            session["username"] = username
-            return redirect(url_for("index"))
-        else:
-            error = "Usuario o contraseña incorrectos"
-    return render_template("login.html", error=error)
+        try:
+            # Asegurar BD lista antes de verificar (por si el init falló al arrancar)
+            database.initialize_db()
+            if database.verify_password(username, password):
+                session["logged_in"] = True
+                session["username"] = username
+                return redirect(url_for("index"))
+            else:
+                flash("Usuario o contraseña incorrectos")
+        except Exception as e:
+            flash(f"Error interno: {e}")
+    return render_template("login.html")
 
 
 @app.route("/logout")
