@@ -330,6 +330,7 @@ def index():
             drafts     = get_wp_drafts(),
             chart_data = get_chart_data(),
             log_lines  = get_log_lines(),
+            feeds      = database.get_feeds(),
         )
     except Exception as e:
         import traceback
@@ -394,6 +395,46 @@ def api_scheduler_toggle():
     enable = bool(data.get("enable", True))
     result = toggle_scheduler_task(enable)
     return jsonify(result)
+
+
+# ─── SOURCES (RSS FEEDS) ─────────────────────────────────────────────────────
+
+@app.route("/api/sources", methods=["GET"])
+@login_required
+def api_sources_list():
+    return jsonify({"feeds": database.get_feeds()})
+
+
+@app.route("/api/sources", methods=["POST"])
+@login_required
+def api_sources_add():
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    url  = (data.get("url") or "").strip()
+    category_hint = data.get("category_hint", "noticia")
+    if not name or not url:
+        return jsonify({"ok": False, "error": "Nombre y URL son obligatorios"}), 400
+    try:
+        feed_id = database.add_feed(name, url, category_hint)
+        return jsonify({"ok": True, "id": feed_id})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route("/api/sources/<int:feed_id>", methods=["DELETE"])
+@login_required
+def api_sources_delete(feed_id):
+    database.delete_feed(feed_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/sources/<int:feed_id>/toggle", methods=["POST"])
+@login_required
+def api_sources_toggle(feed_id):
+    data = request.get_json() or {}
+    enabled = bool(data.get("enabled", True))
+    database.toggle_feed(feed_id, enabled)
+    return jsonify({"ok": True})
 
 
 # ─── MAIN ────────────────────────────────────────────────────────────────────

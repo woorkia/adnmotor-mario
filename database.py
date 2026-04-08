@@ -48,6 +48,15 @@ def initialize_db() -> None:
                 password   TEXT NOT NULL,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS rss_feeds (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                name          TEXT NOT NULL,
+                url           TEXT NOT NULL UNIQUE,
+                category_hint TEXT DEFAULT 'noticia',
+                enabled       INTEGER DEFAULT 1,
+                created_at    TEXT DEFAULT (datetime('now'))
+            );
         """)
 
     # Asegurar que el usuario correcto existe
@@ -67,6 +76,20 @@ def initialize_db() -> None:
                 (default_user, pw_hash)
             )
             logger.info(f"Usuario creado: {default_user}")
+
+    # Seed fuentes RSS por defecto si la tabla está vacía
+    with get_connection() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM rss_feeds").fetchone()[0]
+        if count == 0:
+            default_feeds = [
+                ("Motor.es",  "https://www.motor.es/feed/",      "noticia"),
+                ("Autopista", "https://www.autopista.es/rss.xml", "noticia"),
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO rss_feeds (name, url, category_hint) VALUES (?, ?, ?)",
+                default_feeds
+            )
+            logger.info("Fuentes RSS por defecto creadas")
 
     logger.debug(f"Base de datos inicializada en: {DB_PATH}")
 
@@ -156,3 +179,51 @@ def record_run(stats: dict) -> None:
             stats.get("articles_failed", 0),
         ))
     logger.info(f"Run registrado: {stats}")
+
+
+# ─── RSS FEEDS CRUD ──────────────────────────────────────────────────────────
+
+def get_feeds() -> list:
+    """Devuelve todos los feeds RSS (solo los activos para el pipeline)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM rss_feeds ORDER BY id ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_active_feeds() -> list:
+    """Devuelve solo los feeds activos (enabled=1) para el pipeline."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM rss_feeds WHERE enabled=1 ORDER BY id ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_feed(name: str, url: str, category_hint: str = "noticia") -> int:
+    """Añade una nueva fuente RSS. Devuelve el id creado."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO rss_feeds (name, url, category_hint) VALUES (?, ?, ?)",
+            (name.strip(), url.strip(), category_hint)
+        )
+    logger.info(f"Feed añadido: {name} → {url}")
+    return cur.lastrowid
+
+
+def delete_feed(feed_id: int) -> None:
+    """Elimina una fuente RSS por id."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM rss_feeds WHERE id = ?", (feed_id,))
+    logger.info(f"Feed eliminado: id={feed_id}")
+
+
+def toggle_feed(feed_id: int, enabled: bool) -> None:
+    """Activa o desactiva una fuente RSS."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE rss_feeds SET enabled = ? WHERE id = ?",
+            (1 if enabled else 0, feed_id)
+        )
+    logger.info(f"Feed id={feed_id} → {'activo' if enabled else 'desactivado'}")

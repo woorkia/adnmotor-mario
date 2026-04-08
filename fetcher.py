@@ -7,7 +7,8 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 
-from config import RSS_FEEDS, MIN_ARTICLE_CONTENT_LENGTH, REQUEST_DELAY_SECONDS
+import database
+from config import MIN_ARTICLE_CONTENT_LENGTH, REQUEST_DELAY_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ def fetch_all_feeds() -> List[RawArticle]:
     all_articles: List[RawArticle] = []
     seen_urls: set = set()
 
-    for i, feed_config in enumerate(RSS_FEEDS):
+    active_feeds = database.get_active_feeds()
+    for i, feed_config in enumerate(active_feeds):
         if i > 0:
             time.sleep(REQUEST_DELAY_SECONDS)
 

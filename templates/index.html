@@ -732,6 +732,83 @@
 
   </div>
 
+  <!-- ── FUENTES RSS ───────────────────────────────────────────── -->
+  <section class="table-section">
+    <div class="section-label" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Fuentes RSS</span>
+      <button class="btn-run" style="font-size:12px;padding:6px 14px;" onclick="document.getElementById('addSourceForm').classList.toggle('hidden')">+ Añadir fuente</button>
+    </div>
+
+    <!-- Formulario añadir fuente -->
+    <div id="addSourceForm" class="card hidden" style="margin-bottom:16px;padding:20px;">
+      <div style="display:grid;grid-template-columns:1fr 2fr 140px auto;gap:10px;align-items:end;">
+        <div>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;">Nombre</label>
+          <input id="srcName" type="text" placeholder="Motorpasión" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;">URL del RSS</label>
+          <input id="srcUrl" type="url" placeholder="https://www.motorpasion.com/rss" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:6px;">Categoría</label>
+          <select id="srcCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 12px;outline:none;">
+            <option value="noticia">Noticia</option>
+            <option value="prueba">Prueba</option>
+            <option value="comparativa">Comparativa</option>
+            <option value="guia">Guía</option>
+          </select>
+        </div>
+        <div>
+          <button class="btn-run" style="font-size:13px;padding:9px 18px;margin-top:0;" onclick="addSource()">Añadir</button>
+        </div>
+      </div>
+      <div id="srcError" style="color:#ff6b75;font-size:12px;margin-top:10px;display:none;"></div>
+    </div>
+
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>URL RSS</th>
+              <th>Categoría</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="feedsBody">
+            {% for f in feeds %}
+            <tr id="feed-row-{{ f.id }}">
+              <td><strong>{{ f.name }}</strong></td>
+              <td class="mono" style="font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ f.url }}</td>
+              <td><span class="badge-type">{{ f.category_hint }}</span></td>
+              <td>
+                {% if f.enabled %}
+                  <span class="badge-ok">Activa</span>
+                {% else %}
+                  <span class="badge-fail">Pausada</span>
+                {% endif %}
+              </td>
+              <td style="display:flex;gap:8px;align-items:center;">
+                {% if f.enabled %}
+                  <button class="btn-view" style="background:rgba(255,200,0,0.1);color:#ffc800;border-color:#ffc800;" onclick="toggleFeed({{ f.id }}, false)">Pausar</button>
+                {% else %}
+                  <button class="btn-view" style="background:rgba(0,200,100,0.1);color:#00c864;border-color:#00c864;" onclick="toggleFeed({{ f.id }}, true)">Activar</button>
+                {% endif %}
+                <button class="btn-view" style="background:rgba(230,57,70,0.1);color:#e63946;border-color:#e63946;" onclick="deleteFeed({{ f.id }}, '{{ f.name }}')">Eliminar</button>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row"><td colspan="5">No hay fuentes configuradas</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <!-- ── DRAFTS TABLE ──────────────────────────────────────────── -->
   <section class="table-section">
     <div class="section-label">Borradores en WordPress</div>
@@ -1143,6 +1220,62 @@ function showToast(msg, type = 'info') {
   toast.innerHTML = `${icons[type] || ''} ${msg}`;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { toast.className = type; }, 4000);
+}
+
+// ── FUENTES RSS ──────────────────────────────────────────────────
+async function addSource() {
+  const name     = document.getElementById('srcName').value.trim();
+  const url      = document.getElementById('srcUrl').value.trim();
+  const category = document.getElementById('srcCategory').value;
+  const errEl    = document.getElementById('srcError');
+
+  if (!name || !url) {
+    errEl.textContent = 'Nombre y URL son obligatorios';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const res = await fetch('/api/sources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, url, category_hint: category })
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast('Fuente añadida correctamente', 'ok');
+    document.getElementById('srcName').value = '';
+    document.getElementById('srcUrl').value  = '';
+    document.getElementById('addSourceForm').classList.add('hidden');
+    setTimeout(() => location.reload(), 800);
+  } else {
+    errEl.textContent = data.error || 'Error al añadir la fuente';
+    errEl.style.display = 'block';
+  }
+}
+
+async function toggleFeed(id, enabled) {
+  const res = await fetch(`/api/sources/${id}/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    showToast(enabled ? 'Fuente activada' : 'Fuente pausada', 'ok');
+    setTimeout(() => location.reload(), 800);
+  }
+}
+
+async function deleteFeed(id, name) {
+  if (!confirm(`¿Eliminar la fuente "${name}"? Esta acción no se puede deshacer.`)) return;
+  const res = await fetch(`/api/sources/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.ok) {
+    showToast('Fuente eliminada', 'ok');
+    document.getElementById(`feed-row-${id}`)?.remove();
+  }
 }
 </script>
 </body>
